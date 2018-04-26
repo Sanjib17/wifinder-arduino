@@ -13,29 +13,30 @@ const char *password = "12345678"; // You can change it according to your ease
 
 ESP8266WebServer server(80); // establishing server at port 80 (HTTP protocol's default port)
 
-
-// Writing a simple HTML page.
-char HTML[] = "<html><body><h1>WiFinder</h1><button><a href=\"status\">Toggle LED</a></button></body></html>"; // --> Simple HTML page
-
-
-// This function will be called whenever anyone requests 192.168.4.1 within the local area connection of this ESP module.
-void handleRoot() 
+// This function will be called whenever send a GET reuest to 192.168.4.1/status within the local area connection of this ESP module.
+void statusGet()
 {
-  server.send(200, "text/html",HTML);
-}
-
-// This function will be called whenever anyone requests 192.168.4.1/toggle within the local area connection of this ESP module.
-void status()
-{
-  lost = !lost;
-  digitalWrite(led,!digitalRead(led));
-
   if(lost)
     server.send(200, "text/json", "{\"lost:\" true}");
   else
     server.send(200, "text/json", "{\"lost:\" false}");
 }
 
+void statusPut() {
+  String requestBody = server.arg("plain");
+
+  // Sloppy parsing, but works for now.
+  if(requestBody.indexOf("true") > 0) {
+    lost = true;
+  } else {
+    lost = false;
+    digitalWrite(led, LOW);
+  }
+
+  Serial.println(requestBody);
+
+  server.send(204);
+}
 
 void beep() {
     for(int i=0;i<80;i++)
@@ -57,8 +58,8 @@ void beep() {
 
 void setup() {
   delay(1000);
-  pinMode(led,OUTPUT);
-  pinMode(buzzer,OUTPUT);
+  pinMode(led, OUTPUT);
+  pinMode(buzzer, OUTPUT);
   Serial.begin(115200);
   Serial.println();
 
@@ -70,15 +71,17 @@ void setup() {
   Serial.print("AP IP address: ");
   Serial.println(myIP);
   
-  server.on("/", handleRoot);
-  server.on("/status", status);
+  server.on("/status", HTTP_GET, statusGet);
+  server.on("/status", HTTP_PUT, statusPut);
   server.begin();
   Serial.println("HTTP server started");
 }
 
 void loop() {
-  if(lost)
+  if(lost) {
     beep();
+    digitalWrite(led, !digitalRead(led));
+  }
   
   server.handleClient();
 }
